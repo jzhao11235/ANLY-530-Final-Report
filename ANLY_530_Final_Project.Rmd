@@ -1,0 +1,211 @@
+---
+title: "ANLY 530 Final Project"
+author: "Jia Zhao"
+date: "8/1/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+Competitiveness, market share, professional development and personal support to community action, health, culture, education and sport, are linked to a promising new market. Coupled with the development of organizations, the pressure to achieve goals more audacious, employees increasingly overwhelmed, they end up buying some disturbance in the health-related type of labor activity. The objective of this project is to apply some machine learning algorithms in the prediction of absenteeism at work. The database is the information collected records of absenteeism from work during the period of July/07 to July/2010 in a Courier company. Absences certified with the International Classification of Diseases were stratified into 21 categories, the data were tabulated and stored in two datasets (training and testing set).
+## Object 
+The objective of this project is to apply some machine learning algorithms in the prediction of absenteeism at work.
+Your job is to design a machine learning algorithm which tends to predict the absenteeism in hours.
+## Task 1 - Mandatory
+Since the target variable is continuous, you should break it to some smaller sub groups:
+Group 0: Number of hours=0
+Group 1: 0 < Number of hours <= 6
+Group 2: Number of hours > 6
+
+## Task 2- Optional (extra credit)
+Predict the number of hours of absence without converting it to categorical variable (consider the continuous value)
+
+
+## Loading libraries, Import Data, and Correlation {.tabset}
+
+### Load Libraries
+```{r, message = FALSE, Warning = FALSE}
+library(readr)
+library(caret) #train function for modeling, varImp
+library(rattle)
+library(party)
+library(ggpubr)
+library(ggplot2)
+library(GGally) #Scatterplot Matrix - ggpairs
+library(dplyr)
+library(corrplot) # Scatterplot Matrix - corrplot
+library(ggcorrplot) # Scatterplot Matrix - ggcorrplot
+library(randomForest) # RandomForest model
+library(naivebayes)
+
+```
+
+## Import Data 
+
+```{r}
+data <-read_csv("C:/Users/jzhao/Desktop/ANLY 530 Final Project/Absenteeism_at_work_train.csv")
+```
+
+### Checking variables and data processing
+```{r}
+str(data)
+data$Age <- as.numeric(data$Age)
+```
+
+### Checking for Missing or NA Values
+```{r}
+df <- na.omit(data)
+df <- data.frame(data)
+```
+
+### Add a group column in the df
+```{r}
+df <- df %>% mutate(
+  group = case_when(
+    Absenteeism.time.in.hours == 0 ~ "0",
+    Absenteeism.time.in.hours >0 & Absenteeism.time.in.hours <= 6 ~ "1",
+    Absenteeism.time.in.hours >6  ~ "2"
+  )
+)
+df$group <- as.numeric(df$group)
+```
+
+
+### Remove columns for the ID and Absenteeism.time.in.hours
+```{r}
+df <- df[,-c(1,21)]
+head(df)
+
+```
+
+### Scatterplot Matrix
+```{r, message = FALSE, warning = FALSE}
+#sc <- ggpairs(df)
+#sc
+res <- round(cor(df),2)
+ggcorrplot(res, type = "lower", lab =TRUE) #NAs also appear if there are attributes with zero variance (with all elements equal)
+
+```
+
+
+### Create Attribute Information Table
+```{r}
+Attribute_information <- c("Certain infectious and parasitic diseases",
+                           "Neoplasms",
+                           "Diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism",
+                           "Endocrine, nutritional and metabolic diseases",
+                           "Mental and behavioural disorders",
+                           "Diseases of the nervous system",
+                           "Diseases of the eye and adnexa",
+                           "Diseases of the ear and mastoid process",
+                           "Diseases of the circulatory system",
+                           "Diseases of the respiratory system",
+                           "Diseases of the digestive system",
+                           "Diseases of the skin and subcutaneous tissue",
+                           "Diseases of the musculoskeletal system and connective tissue",
+                           "Diseases of the genitourinary system",
+                           "Pregnancy, childbirth and the puerperium",
+                           "Certain conditions originating in the perinatal period",
+                           "Congenital malformations, deformations and chromosomal abnormalities",
+                           "Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified",
+                           "Injury, poisoning and certain other consequences of external causes",
+                           "External causes of morbidity and mortality",
+                           "Factors influencing health status and contact with health services",
+                           "categories without (CID) patient follow-up",
+                           "medical consultation",
+                           "blood donation",
+                           "laboratory examination",
+                           "unjustified absence",
+                           "physiotherapy",
+                           "dental consultation"
+                           )
+Attribute_information <- data.frame(Attribute_information)
+Attribute_information <- tibble::rowid_to_column(Attribute_information, "ID")
+#Attribute_information %>% mutate(id = row_number())
+Attribute_information$Attribute_information <- as.character(Attribute_information$Attribute_information)
+head(Attribute_information)
+```
+
+## Splitting the data
+
+### splitting the data into training data (80%) and test data (20%)
+```{r}
+set.seed(12345)
+df_rand <- df[order(runif(666)),]
+df_train <- df_rand[1：530,]
+df_test <- df_rand[531:666,]
+
+summary(df_rand$Absenteeism.time.in.hours)
+summary(df_train$Absenteeism.time.in.hours)
+summary(df_test$Absenteeism.time.in.hours)
+
+prop.table(table(df_rand$group))
+prop.table(table(df_train$group))
+prop.table(table(df_test$group))
+```
+Since group distribution of rand data, training data and test data look simiar, the randomization went well
+
+## Logistic Regreesion Results
+
+### Summary
+```{r}
+fit_log <- glm(group ~., data = df_train)
+summary(fit_log)
+``` 
+
+### Predict data 
+```{r}
+log_prod <- predict(fit_log, df_test, type = "response")
+log_pred <- rep(0, dim(df_test)[1])
+log_pred[log_prod >.5] = 1
+log_pred[log_prod >1.5] = 2
+
+(p <- table(log_pred, df_test$group))
+(Accuracy <- sum(diag(p))/sum(p)*100)
+```
+
+## Random Forest
+
+### Summary
+```{r}
+random_model <- randomForest(group ~., data = df_train, na.action = na.exclude, ntree = 100, proximity = T)
+summary(random_model)
+```
+
+### Accuracy
+```{r}
+random_prod <- predict(random_model, df_test, type = "response")
+random_pred <- rep(0, dim(df_test)[1])
+random_pred[random_prod >.5] = 1
+random_pred[random_prod >1.5] = 2
+
+(p <- table(log_pred, df_test$group))
+(Accuracy <- sum(diag(p))/sum(p)*100)
+
+```
+
+## Navie Bayes
+
+### Summary
+```{r}
+df_train$group <- as.character(df_train$group)
+naive_model <- naive_bayes(group ~. , data = df_train) 
+summary(naive_model)
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
