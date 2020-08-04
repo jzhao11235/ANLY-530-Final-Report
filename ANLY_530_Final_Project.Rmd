@@ -42,13 +42,14 @@ library(corrplot) # Scatterplot Matrix - corrplot
 library(ggcorrplot) # Scatterplot Matrix - ggcorrplot
 library(randomForest) # RandomForest model
 library(naivebayes)
+library(class)
 
 ```
 
 ## Import Data 
 
 ```{r}
-data <-read_csv("C:/Users/jzhao/Desktop/ANLY 530 Final Project/Absenteeism_at_work_train.csv")
+data <-read_csv("Absenteeism_at_work_train.csv")
 ```
 
 ### Checking variables and data processing
@@ -85,10 +86,11 @@ head(df)
 
 ### Scatterplot Matrix
 ```{r, message = FALSE, warning = FALSE}
-#sc <- ggpairs(df)
-#sc
+# sc <- ggpairs(df)
+# sc
 res <- round(cor(df),2)
-ggcorrplot(res, type = "lower", lab =TRUE) #NAs also appear if there are attributes with zero variance (with all elements equal)
+ggcorrplot(res, type = "lower", ggtheme = ggplot2::theme_gray, insig = "blank", lab =TRUE) #NAs also appear if there are attributes with zero variance (with all elements equal)
+ggcorrplot(res, type = "lower", ggtheme = ggplot2::theme_gray, insig = "blank", lab =FALSE) #NAs also appear if there are attributes with zero variance (with all elements equal)
 
 ```
 
@@ -137,7 +139,7 @@ head(Attribute_information)
 ```{r}
 set.seed(12345)
 df_rand <- df[order(runif(666)),]
-df_train <- df_rand[1：530,]
+df_train <- df_rand[1:530,]
 df_test <- df_rand[531:666,]
 
 summary(df_rand$Absenteeism.time.in.hours)
@@ -184,7 +186,7 @@ random_pred <- rep(0, dim(df_test)[1])
 random_pred[random_prod >.5] = 1
 random_pred[random_prod >1.5] = 2
 
-(p <- table(log_pred, df_test$group))
+(p <- table(random_pred, df_test$group))
 (Accuracy <- sum(diag(p))/sum(p)*100)
 
 ```
@@ -198,14 +200,32 @@ naive_model <- naive_bayes(group ~. , data = df_train)
 summary(naive_model)
 ```
 
+### Accuracy
 ```{r}
-test
+naive_prod <- predict(naive_model, newdata = df_test)
+naive_pred <- rep(0, dim(df_test)[1])
+naive_pred[naive_prod >.5] = 1
+naive_pred[naive_prod >1.5] = 2
+
+(p <- table(naive_pred, df_test$group))
+(Accuracy <- sum(diag(p))/sum(p)*100)
 ```
+## KNN
 
+### Summary
 ```{r}
-
+df_train$group <- as.factor(df_train$group)
+df_test$group <- as.factor(df_test$group)
+df_train <- na.omit(df_train)
+df_test <- na.omit(df_test)
+df_train
+df_test
+df_train_labels <- df_train[1:527,20]
+KNN_model <- knn(train = df_train, test = df_test, cl=df_train_labels, k = 13)
+summary(KNN_model)
 ```
-
+### Accuracy
 ```{r}
-
+(p <- table(KNN_model, df_test$group))
+(Accuracy <- sum(diag(p))/sum(p)*100)
 ```
