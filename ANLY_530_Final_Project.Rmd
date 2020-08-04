@@ -42,13 +42,15 @@ library(corrplot) # Scatterplot Matrix - corrplot
 library(ggcorrplot) # Scatterplot Matrix - ggcorrplot
 library(randomForest) # RandomForest model
 library(naivebayes)
-library(class)
+library(class) # KNN model
+library(rpart.plot)
+library(rpart)
 
 ```
 
 ## Import Data 
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 data <-read_csv("Absenteeism_at_work_train.csv")
 ```
 
@@ -61,7 +63,7 @@ data$Age <- as.numeric(data$Age)
 ### Checking for Missing or NA Values
 ```{r}
 df <- na.omit(data)
-df <- data.frame(data)
+df <- data.frame(df)
 ```
 
 ### Add a group column in the df
@@ -74,6 +76,7 @@ df <- df %>% mutate(
   )
 )
 df$group <- as.numeric(df$group)
+head(df)
 ```
 
 
@@ -81,7 +84,6 @@ df$group <- as.numeric(df$group)
 ```{r}
 df <- df[,-c(1,21)]
 head(df)
-
 ```
 
 ### Scatterplot Matrix
@@ -89,48 +91,47 @@ head(df)
 # sc <- ggpairs(df)
 # sc
 res <- round(cor(df),2)
-ggcorrplot(res, type = "lower", ggtheme = ggplot2::theme_gray, insig = "blank", lab =TRUE) #NAs also appear if there are attributes with zero variance (with all elements equal)
+#ggcorrplot(res, type = "lower", ggtheme = ggplot2::theme_gray, insig = "blank", lab =TRUE) #NAs also appear if there are attributes with zero variance (with all elements equal)
 ggcorrplot(res, type = "lower", ggtheme = ggplot2::theme_gray, insig = "blank", lab =FALSE) #NAs also appear if there are attributes with zero variance (with all elements equal)
-
+df <- df[,-11] # Rmove Disciplinary.failure
 ```
-
 
 ### Create Attribute Information Table
 ```{r}
-Attribute_information <- c("Certain infectious and parasitic diseases",
-                           "Neoplasms",
-                           "Diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism",
-                           "Endocrine, nutritional and metabolic diseases",
-                           "Mental and behavioural disorders",
-                           "Diseases of the nervous system",
-                           "Diseases of the eye and adnexa",
-                           "Diseases of the ear and mastoid process",
-                           "Diseases of the circulatory system",
-                           "Diseases of the respiratory system",
-                           "Diseases of the digestive system",
-                           "Diseases of the skin and subcutaneous tissue",
-                           "Diseases of the musculoskeletal system and connective tissue",
-                           "Diseases of the genitourinary system",
-                           "Pregnancy, childbirth and the puerperium",
-                           "Certain conditions originating in the perinatal period",
-                           "Congenital malformations, deformations and chromosomal abnormalities",
-                           "Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified",
-                           "Injury, poisoning and certain other consequences of external causes",
-                           "External causes of morbidity and mortality",
-                           "Factors influencing health status and contact with health services",
-                           "categories without (CID) patient follow-up",
-                           "medical consultation",
-                           "blood donation",
-                           "laboratory examination",
-                           "unjustified absence",
-                           "physiotherapy",
-                           "dental consultation"
-                           )
-Attribute_information <- data.frame(Attribute_information)
-Attribute_information <- tibble::rowid_to_column(Attribute_information, "ID")
-#Attribute_information %>% mutate(id = row_number())
-Attribute_information$Attribute_information <- as.character(Attribute_information$Attribute_information)
-head(Attribute_information)
+# Attribute_information <- c("Certain infectious and parasitic diseases",
+#                            "Neoplasms",
+#                            "Diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism",
+#                            "Endocrine, nutritional and metabolic diseases",
+#                            "Mental and behavioural disorders",
+#                            "Diseases of the nervous system",
+#                            "Diseases of the eye and adnexa",
+#                            "Diseases of the ear and mastoid process",
+#                            "Diseases of the circulatory system",
+#                            "Diseases of the respiratory system",
+#                            "Diseases of the digestive system",
+#                            "Diseases of the skin and subcutaneous tissue",
+#                            "Diseases of the musculoskeletal system and connective tissue",
+#                            "Diseases of the genitourinary system",
+#                            "Pregnancy, childbirth and the puerperium",
+#                            "Certain conditions originating in the perinatal period",
+#                            "Congenital malformations, deformations and chromosomal abnormalities",
+#                            "Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified",
+#                            "Injury, poisoning and certain other consequences of external causes",
+#                            "External causes of morbidity and mortality",
+#                            "Factors influencing health status and contact with health services",
+#                            "categories without (CID) patient follow-up",
+#                            "medical consultation",
+#                            "blood donation",
+#                            "laboratory examination",
+#                            "unjustified absence",
+#                            "physiotherapy",
+#                            "dental consultation"
+#                            )
+# Attribute_information <- data.frame(Attribute_information)
+# Attribute_information <- tibble::rowid_to_column(Attribute_information, "ID")
+# #Attribute_information %>% mutate(id = row_number())
+# Attribute_information$Attribute_information <- as.character(Attribute_information$Attribute_information)
+# head(Attribute_information)
 ```
 
 ## Splitting the data
@@ -138,13 +139,9 @@ head(Attribute_information)
 ### splitting the data into training data (80%) and test data (20%)
 ```{r}
 set.seed(12345)
-df_rand <- df[order(runif(666)),]
-df_train <- df_rand[1:530,]
-df_test <- df_rand[531:666,]
-
-summary(df_rand$Absenteeism.time.in.hours)
-summary(df_train$Absenteeism.time.in.hours)
-summary(df_test$Absenteeism.time.in.hours)
+df_rand <- df[order(runif(662)),]
+df_train <- df_rand[1:529,]
+df_test <- df_rand[530:662,]
 
 prop.table(table(df_rand$group))
 prop.table(table(df_train$group))
@@ -175,7 +172,7 @@ log_pred[log_prod >1.5] = 2
 
 ### Summary
 ```{r}
-random_model <- randomForest(group ~., data = df_train, na.action = na.exclude, ntree = 100, proximity = T)
+random_model <- randomForest(group ~., data = df_train, ntree = 100, proximity = T)
 summary(random_model)
 ```
 
@@ -191,6 +188,18 @@ random_pred[random_prod >1.5] = 2
 
 ```
 
+## Adding regression to trees
+
+### Summary
+```{r}
+df.rpart <- rpart(group ~. , data = df)
+df.rpart
+```
+### Graph
+```{r}
+rpart.plot(df.rpart, digits = 3, fallen.leaves = TRUE, type =, extra =101)
+
+```
 ## Navie Bayes
 
 ### Summary
@@ -201,13 +210,10 @@ summary(naive_model)
 ```
 
 ### Accuracy
-```{r}
+```{r,message= FALSE, warning=FALSE}
 naive_prod <- predict(naive_model, newdata = df_test)
-naive_pred <- rep(0, dim(df_test)[1])
-naive_pred[naive_prod >.5] = 1
-naive_pred[naive_prod >1.5] = 2
 
-(p <- table(naive_pred, df_test$group))
+(p <- table(naive_prod, df_test$group))
 (Accuracy <- sum(diag(p))/sum(p)*100)
 ```
 ## KNN
@@ -216,11 +222,7 @@ naive_pred[naive_prod >1.5] = 2
 ```{r}
 df_train$group <- as.factor(df_train$group)
 df_test$group <- as.factor(df_test$group)
-df_train <- na.omit(df_train)
-df_test <- na.omit(df_test)
-df_train
-df_test
-df_train_labels <- df_train[1:527,20]
+df_train_labels <- df_train[1:529,19]
 KNN_model <- knn(train = df_train, test = df_test, cl=df_train_labels, k = 13)
 summary(KNN_model)
 ```
